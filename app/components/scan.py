@@ -16,7 +16,19 @@ System requirements:
 import pytesseract
 from pdf2image import convert_from_path
 from PIL import Image
+import logging
 import os
+
+# --- 1. Logging Configuration ---
+# Set up basic configuration for logging
+# level=logging.DEBUG ensures that DEBUG messages (the lowest level) are captured
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    force=True,
+)
+logger = logging.getLogger(__name__)
+
 
 # If tesseract is not in PATH, specify the path (Windows example)
 # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -39,11 +51,11 @@ def extract_text_from_scanned_pdf(pdf_path, output_txt_path=None, dpi=300, lang=
     if not os.path.exists(pdf_path):
         raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
-    print(f"Converting PDF to images...")
+    logger.info(f"Converting PDF to images...")
     # Convert PDF to list of images
     images = convert_from_path(pdf_path, dpi=dpi)
 
-    print(f"Processing {len(images)} pages...")
+    logger.info(f"Processing {len(images)} pages...")
     extracted_text = []
 
     # Process each page
