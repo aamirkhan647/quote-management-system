@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pypdf2                  # For PDF parsing
+google-cloud-storage    # To read PDFs from GCS
+google-cloud-aiplatform # To trigger the pipeline
+kfp==2.7.0              # Kubeflow Pipelines SDK
