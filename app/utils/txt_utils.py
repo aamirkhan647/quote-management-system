@@ -10,6 +10,8 @@ import pandas as pd
 import pytesseract
 from PIL import Image
 import pypdfium2
+from collections import Counter
+from typing import Dict, List
 
 
 # --- 1. Normalization Functions ---
@@ -109,3 +111,11 @@ def clean_ocr_text(text: str) -> str:
     text = remove_punctuation(text)
     text = remove_whitespace(text)
     return text
+
+
+def get_char_vector(word: str) -> Dict[str, int]:
+    """
+    Creates a character frequency vector (Bag-of-Characters) for a given word.
+    Example: 'apple' -> {'a': 1, 'p': 2, 'l': 1, 'e': 1}
+    """
+    return Counter(word.lower())
