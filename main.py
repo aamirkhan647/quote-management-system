@@ -58,7 +58,7 @@ def main():
     # file_classify["Claim_Type"] = None
     # file_classify["Form_Type"] = None
 
-    for i in range(2):  # len(pdf_paths)):
+    for i in range(len(pdf_paths)):
         logger.info(f"\n--- File {i+1}/{len(pdf_paths)}: {pdf_paths[i]} ---")
 
         try:
@@ -89,7 +89,7 @@ def main():
             # Process the loaded bytes
             # print(process_pdf(pdf_bytes))
             val = quote_classification(pdf_bytes)
-            logger.info(val)
+            # logger.info(val)
             # file_classify.at[i,"Claim_Category"] = val
 
         except PermissionError:

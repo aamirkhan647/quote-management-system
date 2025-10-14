@@ -53,16 +53,23 @@ def quote_classification(
         "regex_quote_submission": None,
         "regex_quote_class": None,
         "regex_quote_type": None,
-        "broker_name": None,
-        "form_id": None,
+        "regex_broker_name": None,
+        "regex_form_id": None,
+        "semantic_quote_submission": None,
+        "semantic_quote_class": None,
+        "semantic_quote_type": None,
+        "semantic_broker_name": None,
+        "semantic_form_id": None,
     }
 
     ##############################
     # STEP 1: Load the PDF document directly from the bytes object
+    ##############################
     clean_text = extract_pdf_text(pdf_bytes)
 
     ##############################
     # STEP 2: REGEX Match
+    ##############################
     # Match Personal Auto
     if keyword_matches(clean_text, exact_match_keywords["personal_auto"]) > 0:
         quote_status["regex_quote_submission"] = True
@@ -99,6 +106,7 @@ def quote_classification(
 
     ##############################
     # STEP 3: Semantic Similarity
+    ##############################
     # Create bi/tri-grams
     two_word_phrases = [" ".join(pair) for pair in ngrams(clean_text, 2)]
     three_word_phrases = [" ".join(trio) for trio in ngrams(clean_text, 3)]
@@ -118,6 +126,7 @@ def quote_classification(
 
     ##############################
     # STEP 4: Logo Search
+    ##############################
 
     logger.info(f"\n{pprint.pformat(quote_status)}")
 

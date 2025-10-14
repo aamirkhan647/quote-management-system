@@ -200,7 +200,7 @@ def semantic_search(
     for target_label in target_list:
         for txt in text_list:
             threshold = cosine_similarity(target_label, txt)
-            if threshold > 0.97:
+            if threshold > 0.95:
                 temp.append(txt)
                 logger.info(
                     f"Match found: {target_label} <-> {txt} (Similarity: {threshold:.4f})"

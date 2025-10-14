@@ -61,14 +61,12 @@ personal_trigrams = [
 # COMMERCIAL KEYWORDS
 ############################################
 commercial_words = [
-    "commercial",
     "fiduciary",
     "naics",
     "employee/empl",
     "workers",
     "payroll",
     "client",
-    "fleet",
     "inventory",
     "proprietor",
     "entity",
