@@ -192,7 +192,10 @@ def cosine_similarity(word1: str, word2: str) -> float:
     return numerator / denominator
 
 
-def semantic_search(target_list: list, text_list: list):
+def semantic_search(
+    text_list: list,
+    target_list: list,
+):
     temp = []
     for target_label in target_list:
         for txt in text_list:

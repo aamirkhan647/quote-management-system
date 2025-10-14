@@ -63,25 +63,39 @@ def quote_classification(
 
     ##############################
     # STEP 2: REGEX Match
+    # Match Personal Auto
     if keyword_matches(clean_text, exact_match_keywords["personal_auto"]) > 0:
         quote_status["regex_quote_submission"] = True
         quote_status["regex_quote_class"] = "personal"
         quote_status["regex_quote_type"] = "auto"
 
+    # Match Personal Property
     if keyword_matches(clean_text, exact_match_keywords["personal_property"]) > 0:
         quote_status["regex_quote_submission"] = True
         quote_status["regex_quote_class"] = "personal"
         quote_status["regex_quote_type"] = "property"
 
+    # Match Commercial Auto
     if keyword_matches(clean_text, exact_match_keywords["commercial_auto"]) > 0:
         quote_status["regex_quote_submission"] = True
         quote_status["regex_quote_class"] = "commercial"
         quote_status["regex_quote_type"] = "auto"
 
+    # Match Commercial Property
     if keyword_matches(clean_text, exact_match_keywords["commercial_property"]) > 0:
         quote_status["regex_quote_submission"] = True
         quote_status["regex_quote_class"] = "commercial"
         quote_status["regex_quote_type"] = "property"
+
+    # Match Personal Only
+    if keyword_matches(clean_text, personal_words) > 0:
+        quote_status["regex_quote_submission"] = True
+        quote_status["regex_quote_class"] = "personal"
+
+    # Match Commercial Only
+    if keyword_matches(clean_text, commercial_words) > 0:
+        quote_status["regex_quote_submission"] = True
+        quote_status["regex_quote_class"] = "commercial"
 
     ##############################
     # STEP 3: Semantic Similarity
@@ -90,18 +104,14 @@ def quote_classification(
     three_word_phrases = [" ".join(trio) for trio in ngrams(clean_text, 3)]
 
     # Classify personal vs commercial
-    if (
-        semantic_search(personal_words, clean_text)
-        or semantic_search(personal_bigrams, two_word_phrases)
-        or semantic_search(personal_trigrams, three_word_phrases)
+    if semantic_search(two_word_phrases, personal_bigrams) or semantic_search(
+        three_word_phrases, personal_trigrams
     ):
         quote_status["semantic_quote_submission"] = True
         quote_status["semantic_quote_class"] = "personal"
 
-    if (
-        semantic_search(commercial_words, clean_text)
-        or semantic_search(commercial_bigrams, two_word_phrases)
-        or semantic_search(commercial_trigrams, three_word_phrases)
+    if semantic_search(two_word_phrases, commercial_bigrams) or semantic_search(
+        three_word_phrases, commercial_trigrams
     ):
         quote_status["semantic_quote_submission"] = True
         quote_status["semantic_quote_class"] = "commercial"
