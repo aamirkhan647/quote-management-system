@@ -19,16 +19,13 @@ from PIL import Image
 import logging
 import os
 
-# --- 1. Logging Configuration ---
-# Set up basic configuration for logging
-# level=logging.DEBUG ensures that DEBUG messages (the lowest level) are captured
+# Logging Configuration
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     force=True,
 )
 logger = logging.getLogger(__name__)
-
 
 # If tesseract is not in PATH, specify the path (Windows example)
 # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'

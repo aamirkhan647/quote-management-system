@@ -15,21 +15,15 @@ import logging
 from app.components.classification import quote_classification
 from app.utils.pdf_utils import load_pdf
 
-# --- 1. Logging Configuration ---
-# Set up basic configuration for logging
-# level=logging.DEBUG ensures that DEBUG messages (the lowest level) are captured
-logging.basicConfig(level=logging.DEBUG, force=True)
+# Logging Configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    force=True,
+)
 logger = logging.getLogger(__name__)
 
-# logger = logging.getLogger(__name__)
-# logger.setLevel(logging.INFO)  # Set the level for *this specific logger*
-
-# logging.basicConfig(
-#     level=logging.INFO,
-#     format="%(asctime)s - %(levelname)s - %(message)s",
-#     force=True,
-# )
-# logger = logging.getLogger(__name__)
+NPY_DEFAULT_LOG_DOUBLES = 1
 
 
 def main():
@@ -64,7 +58,7 @@ def main():
     # file_classify["Claim_Type"] = None
     # file_classify["Form_Type"] = None
 
-    for i in range(len(pdf_paths)):
+    for i in range(2):  # len(pdf_paths)):
         logger.info(f"\n--- File {i+1}/{len(pdf_paths)}: {pdf_paths[i]} ---")
 
         try:

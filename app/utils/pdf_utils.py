@@ -14,9 +14,7 @@ import fitz
 import logging
 
 
-# --- 1. Logging Configuration ---
-# Set up basic configuration for logging
-# level=logging.DEBUG ensures that DEBUG messages (the lowest level) are captured
+# Logging Configuration
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
