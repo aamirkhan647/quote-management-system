@@ -10,11 +10,12 @@ import pprint
 from app.components.search_functions import (
     keyword_matches,
     semantic_search,
-    search_logo,
+    logo_search,
+    footer_search,
 )
 from app.prompts.insurance_keywords import *
 from app.utils.txt_utils import clean_ocr_text
-from app.utils.pdf_utils import extract_pdf_text
+from app.utils.pdf_utils import extract_pdf_text, convert_pdf_to_images
 
 
 # Logging Configuration
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 def quote_classification(
+    pdf_name: str,
     pdf_bytes: bytes,
 ):
     """
@@ -48,18 +50,18 @@ def quote_classification(
     broker_name = set()
     form_id = set()
 
-    # Create empty DataFrame with classification status
+    # Create classification status in-memory database
     quote_status = {
-        "regex_quote_submission": None,
-        "regex_quote_class": None,
-        "regex_quote_type": None,
-        "regex_broker_name": None,
-        "regex_form_id": None,
-        "semantic_quote_submission": None,
-        "semantic_quote_class": None,
-        "semantic_quote_type": None,
-        "semantic_broker_name": None,
-        "semantic_form_id": None,
+        "regex_quote_submission": False,
+        "regex_quote_class": "",
+        "regex_quote_type": "",
+        "semantic_quote_submission": False,
+        "semantic_quote_class": "",
+        "semantic_quote_type": "",
+        "logo_quote_submission": False,
+        "logo_acord": False,
+        "footer_quote_submission": False,
+        "footer_form_id": "",
     }
 
     ##############################
@@ -125,9 +127,39 @@ def quote_classification(
         quote_status["semantic_quote_class"] = "commercial"
 
     ##############################
-    # STEP 4: Logo Search
+    # STEP 4: Logo Search (Acord forms)
     ##############################
+    # Convert PDF to Images
+    image_paths = convert_pdf_to_images(pdf_name, pdf_bytes, 300)
 
+    # Get all logo image templates for image search
+    root_path = Path("./logos/")
+    logo_files = list(root_path.glob("**/*.jpg"))
+
+    if not logo_files:
+        logger.warning("No logo files found.")
+        exit(0)
+
+    # logger.info(f"Found {len(logo_files)} logo file(s).")
+    logo_paths = list(map(str, logo_files))
+
+    # match_found, confidence, bounding_box = logo_search(
+    #     image_paths, logo_paths, threshold=0.8
+    # )
+
+    # if match_found:
+    #     quote_status["logo_quote_submission"] = True
+    #     quote_status["logo_acord"] = True
+
+    ##############################
+    # STEP 5: Footer Search (Acord Form Number)
+    ##############################
+    form_id = footer_search(image_paths)
+
+    if form_id:
+        quote_status["footer_quote_submission"] = True
+        quote_status["footer_form_id"] = form_id
+
+    #############################################
     logger.info(f"\n{pprint.pformat(quote_status)}")
-
     return quote_status

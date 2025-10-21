@@ -63,7 +63,7 @@ def main():
 
         try:
             ########################################################
-            # STEP 1: Load Attachement Files
+            # STEP 1: Load Attachment Files
             ########################################################
             # Load the entire file content into a bytes object using pathlib's method
             pdf_bytes = load_pdf(pdf_paths[i])
@@ -88,7 +88,8 @@ def main():
 
             # Process the loaded bytes
             # print(process_pdf(pdf_bytes))
-            val = quote_classification(pdf_bytes)
+            path_name = Path(pdf_paths[i]).stem
+            val = quote_classification(path_name, pdf_bytes)
             # logger.info(val)
             # file_classify.at[i,"Claim_Category"] = val
 

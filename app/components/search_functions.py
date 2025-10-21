@@ -18,7 +18,15 @@ import pandas as pd
 import pytesseract
 from PIL import Image
 import pypdfium2
-import logging
+import cv2
+import pytesseract
+from PIL import Image
+import re
+import os
+from typing import Optional
+
+# Set the path to the Tesseract executable if it's not in your PATH
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Import local modules
 from app.utils.txt_utils import clean_ocr_text, get_char_vector
@@ -68,63 +76,6 @@ def keyword_matches(paragraph: str, keywords: list) -> int:
         count = count + len(matches)
 
     return count
-
-
-def search_logo(pdf_bytes):
-
-    try:
-        pdf_document = pypdfium2.PdfDocument(pdf_bytes)
-    except Exception as e:
-        logger.error(
-            f"Failed to open PDF from bytes. Ensure the file is a valid PDF. Error: {e}"
-        )
-        return
-
-    num_pages = len(pdf_document)
-    # print(f"Document successfully loaded. Total pages: {num_pages}")
-
-    if num_pages == 0:
-        logger.warning("Document is empty.")
-        return
-
-    # 2. Access the first page
-    page_index = 0
-    page = pdf_document.get_page(page_index)
-
-    form_type = set()
-    claim_type = set()
-    claim_cat = set()
-
-    # 3. Use the PDF Text Page object for Logo detection
-    for i in [70, 80, 90, 100, 150, 200]:
-        bitmap = page.render(scale=300 / i)
-        image = bitmap.to_pil()
-
-        # Extract Text using Tesseract
-        text1 = pytesseract.image_to_string(image)
-
-        # Clean Text
-        text2 = clean_ocr_text(text1.lower())
-        clean_text = text2.split()
-
-        # Create bi/tri-grams
-        two_word_phrases = [" ".join(pair) for pair in ngrams(clean_text, 2)]
-        three_word_phrases = [" ".join(trio) for trio in ngrams(clean_text, 3)]
-
-        # # Classify personal vs commercial
-        # if ("personal" not in claim_cat) and (
-        #     semantic_search(personal_words, clean_text)
-        #     or semantic_search(personal_bigrams, two_word_phrases)
-        #     or semantic_search(personal_trigrams, three_word_phrases)
-        # ):
-        #     claim_cat.add("personal")
-
-        # if ("commercial" not in claim_cat) and (
-        #     semantic_search(commercial_words, clean_text)
-        #     or semantic_search(commercial_bigrams, two_word_phrases)
-        #     or semantic_search(commercial_trigrams, three_word_phrases)
-        # ):
-        #     claim_cat.add("commercial")
 
 
 def cosine_similarity(word1: str, word2: str) -> float:
@@ -210,3 +161,237 @@ def semantic_search(
             return True
 
     return False
+
+
+# def logo_search(pdf_bytes):
+
+#     try:
+#         pdf_document = pypdfium2.PdfDocument(pdf_bytes)
+#     except Exception as e:
+#         logger.error(
+#             f"Failed to open PDF from bytes. Ensure the file is a valid PDF. Error: {e}"
+#         )
+#         return
+
+#     num_pages = len(pdf_document)
+#     # print(f"Document successfully loaded. Total pages: {num_pages}")
+
+#     if num_pages == 0:
+#         logger.warning("Document is empty.")
+#         return
+
+#     # 2. Access the first page
+#     page_index = 0
+#     page = pdf_document.get_page(page_index)
+
+#     form_type = set()
+#     claim_type = set()
+#     claim_cat = set()
+
+#     # 3. Use the PDF Text Page object for Logo detection
+#     for i in [70, 80, 90, 100, 150, 200]:
+#         bitmap = page.render(scale=300 / i)
+#         image = bitmap.to_pil()
+
+#         # Extract Text using Tesseract
+#         text1 = pytesseract.image_to_string(image)
+
+#         # Clean Text
+#         text2 = clean_ocr_text(text1.lower())
+#         clean_text = text2.split()
+
+#         # Create bi/tri-grams
+#         two_word_phrases = [" ".join(pair) for pair in ngrams(clean_text, 2)]
+#         three_word_phrases = [" ".join(trio) for trio in ngrams(clean_text, 3)]
+
+# # Classify personal vs commercial
+# if ("personal" not in claim_cat) and (
+#     semantic_search(personal_words, clean_text)
+#     or semantic_search(personal_bigrams, two_word_phrases)
+#     or semantic_search(personal_trigrams, three_word_phrases)
+# ):
+#     claim_cat.add("personal")
+
+# if ("commercial" not in claim_cat) and (
+#     semantic_search(commercial_words, clean_text)
+#     or semantic_search(commercial_bigrams, two_word_phrases)
+#     or semantic_search(commercial_trigrams, three_word_phrases)
+# ):
+#     claim_cat.add("commercial")
+
+
+def logo_search(image_paths, logo_paths, threshold=0.8):
+    """
+    Detects a specific pattern (logo/header) within a document image using
+    OpenCV Template Matching.
+
+    Args:
+        image_path (str): Path to the full document image (the ACORD form).
+        template_path (str): Path to the cropped logo template image.
+        threshold (float): Minimum correlation score required to confirm a match.
+
+    Returns:
+        tuple: (bool, float, bounding_box) - Match status, confidence score,
+               and coordinates if found.
+    """
+    # Initialize a global best match tracker (if searching all pages/logos for the single best match)
+    global_best_val = -np.inf
+    global_result = (False, 0.0, None)
+
+    # Define scale steps
+    scales = np.linspace(0.2, 1.0, 10)[::-1]
+
+    for image_path in image_paths:
+        # Load and convert image ONCE per page
+        img = cv2.imread(image_path)
+        if img is None:
+            continue  # Skip if image loading failed
+        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        h_img, w_img = img_gray.shape
+
+        for logo_path in logo_paths:
+            # Load template ONCE per logo
+            template_orig = cv2.imread(logo_path)
+            if template_orig is None:
+                continue
+            template_gray_orig = cv2.cvtColor(template_orig, cv2.COLOR_BGR2GRAY)
+            h_temp_orig, w_temp_orig = template_gray_orig.shape
+
+            best_match_val = -np.inf
+            best_match_loc = None
+            best_match_scale = None
+
+            # Loop over the scales
+            for scale in scales:
+                # 1. Resize the template
+                w_resized = int(w_temp_orig * scale)
+                h_resized = int(h_temp_orig * scale)
+
+                resized_template = cv2.resize(
+                    template_gray_orig, (w_resized, h_resized)
+                )
+
+                # 2. Check size constraints
+                if h_resized > h_img or w_resized > w_img:
+                    continue
+
+                # 3. Perform template matching
+                result = cv2.matchTemplate(
+                    img_gray, resized_template, cv2.TM_CCOEFF_NORMED
+                )
+                _, max_val, _, max_loc = cv2.minMaxLoc(result)
+
+                # 4. Update best match (local to this logo/page)
+                if max_val > best_match_val:
+                    best_match_val = max_val
+                    best_match_loc = max_loc
+                    best_match_scale = scale
+                    best_match_page = image_path
+                    best_match_logo = logo_path
+
+            # --- After Scale Loop ---
+
+            # 5. Check if the best match found exceeds the threshold
+            if best_match_val >= threshold and best_match_loc is not None:
+
+                # Update global best match if current match is better
+                if best_match_val > global_best_val:
+                    global_best_val = best_match_val
+
+                    # 6. Correctly calculate the bounding box using the best_match_scale
+                    final_w = int(w_temp_orig * best_match_scale)
+                    final_h = int(h_temp_orig * best_match_scale)
+
+                    top_left = best_match_loc
+                    bottom_right = (top_left[0] + final_w, top_left[1] + final_h)
+
+                    # Save IMG (FOR TESTING)
+                    # img = cv2.imread(best_match_page)
+                    # cv2.rectangle(img, top_left, bottom_right, (0, 0, 0), 4)
+                    # cv2.imwrite("TEST_IMG.jpg", img)
+
+                    # Update global result
+                    global_result = (True, global_best_val, (top_left, bottom_right))
+
+                    # (Optional) If you want to return the first successful match immediately:
+                    # return global_result
+
+    # Return the single best match found across all pages/logos
+    return global_result
+
+
+def footer_search(image_paths) -> Optional[str]:
+    """
+    Identifies the ACORD form type (e.g., ACORD 125) by performing OCR
+    on the expected footer region of the first page image.
+
+    Args:
+        image_paths (str): Path to the image file (should be Page 1 of the document).
+
+    Returns:
+        Optional[str]: The identified form number (e.g., "ACORD 125"), or None if not found.
+    """
+    for image_path in image_paths:
+        # Load and convert image ONCE per page
+        if not os.path.exists(image_path):
+            print(f"Error: Image file not found at {image_path}")
+            return None
+
+        try:
+            img = Image.open(image_path)
+        except Exception as e:
+            print(f"Error opening image: {e}")
+            return None
+
+        # 1. Define the Region of Interest (ROI) for the footer
+        width, height = img.size
+
+        # We focus on the bottom 10% of the image, as ACORD IDs are typically there.
+        # Adjusting this ROI may be necessary based on your typical document resolution.
+        crop_area_percentage = 0.90  # Start 90% down the image
+
+        # (left, top, right, bottom)
+        footer_roi_box = (0, int(height * crop_area_percentage), width, height)
+
+        # 2. Crop the image to the ROI
+        try:
+            footer_roi = img.crop(footer_roi_box)
+        except ValueError as e:
+            print(f"Error cropping image (ROI dimensions error): {e}")
+            return None
+
+        # 3. Perform OCR on the restricted area
+        # Use config='--psm 6' (Assume a single uniform block of text) for better accuracy
+        # on small regions.
+        ocr_text = pytesseract.image_to_string(footer_roi, config="--psm 6").strip()
+
+        if not ocr_text:
+            # Fallback: Try a slightly higher ROI just in case
+            print("No text found in primary footer ROI. Trying broader area.")
+            footer_roi_box = (0, int(height * 0.85), width, height)  # Start 85% down
+            footer_roi = img.crop(footer_roi_box)
+            ocr_text = pytesseract.image_to_string(footer_roi, config="--psm 6").strip()
+
+        # 4. Use Regular Expressions to find the ACORD pattern
+        # Pattern explanation:
+        # r'ACORD\s*(\d{3})'
+        # - ACORD: literally "ACORD"
+        # - \s*: zero or more whitespace characters (handles OCR spacing errors)
+        # - (\d{3}): exactly three digits (captures the form number, e.g., 125)
+
+        match = re.search(r"ACORD\s*(\d{3})", ocr_text, re.IGNORECASE)
+
+        if match is None:
+            match = re.search(r"ACORD\s*(\d{2})", ocr_text, re.IGNORECASE)
+
+        if match:
+            form_number = match.group(1)  # The captured three digits
+            return f"ACORD {form_number}"
+        else:
+            # Check for the ACORD trademark text, which might appear separately
+            if re.search(r"ACORD", ocr_text, re.IGNORECASE):
+                print(
+                    "Text contains 'ACORD' but specific form number (###) not identified."
+                )
+
+            return None

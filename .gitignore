@@ -1,3 +1,6 @@
 /env
+/temp_files
+.vscode
+.pytest_cache
 __pycache__
 *.txt
