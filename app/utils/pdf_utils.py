@@ -12,6 +12,9 @@ from PIL import Image
 import pypdfium2
 import fitz
 import logging
+import fitz  # PyMuPDF
+import os
+from typing import List, Optional
 
 
 # Logging Configuration
@@ -89,3 +92,78 @@ def extract_pdf_text(pdf_bytes) -> str:
     except Exception as e:
         logger.error(f"An unexpected error occurred during text extraction: {e}")
         return None
+
+
+def convert_pdf_to_images(
+    pdf_name,
+    pdf_bytes: bytes,
+    max_pages: int,
+    dpi: int = 300,
+) -> Optional[List[str]]:
+    """
+    Converts the first two pages of a PDF document (provided as bytes)
+    into high-resolution images.
+
+    Args:
+        pdf_bytes (bytes): The byte content of the PDF file.
+        document_name (str): A descriptive name used for saving the output images.
+        output_folder (str): The directory where the resulting images will be saved.
+        dpi (int): The resolution (DPI) for the output images. 300 DPI recommended.
+
+    Returns:
+        Optional[List[str]]: A list of file paths to the generated images (page 0 and page 1),
+                             or None if an error occurs.
+    """
+
+    if not pdf_bytes:
+        print("Error: PDF bytes object is empty.")
+        return None
+
+    # 1. Prepare output directory
+    os.makedirs("./temp_files", exist_ok=True)
+
+    image_paths = []
+
+    try:
+        # Open the PDF document directly from the byte buffer
+        # This is the key difference from the file path method
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+        # Calculate the scaling factor for the desired DPI
+        zoom = dpi / 72.0
+        matrix = fitz.Matrix(zoom, zoom)
+
+        # Determine how many pages to process (max 2)
+        pages_to_process = min(max_pages, len(doc))
+
+        print(
+            f"Found {len(doc)} pages. Converting {pages_to_process} page(s) to images..."
+        )
+
+        # 2. Iterate through the first two pages (index 0 and 1)
+        for page_num in range(pages_to_process):
+            page = doc.load_page(page_num)
+
+            # Create a high-resolution pixmap
+            pix = page.get_pixmap(matrix=matrix, alpha=False)
+
+            # Define the output file name using the provided document_name
+            output_filename = f"{pdf_name}_page_{page_num + 1}.png"
+            output_path = os.path.join("./temp_files", output_filename)
+
+            # Save the image
+            pix.save(output_path)
+            image_paths.append(output_path)
+
+            print(f"Successfully created: {output_path}")
+
+    except Exception as e:
+        print(f"An error occurred during PDF conversion: {e}")
+        return None
+
+    finally:
+        # Ensure the document is closed
+        if "doc" in locals() and doc:
+            doc.close()
+
+    return image_paths
