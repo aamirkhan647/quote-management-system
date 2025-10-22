@@ -12,6 +12,7 @@ from app.components.search_functions import (
     semantic_search,
     logo_search,
     footer_search,
+    gemini_classify,
 )
 from app.prompts.insurance_keywords import *
 from app.utils.txt_utils import clean_ocr_text
@@ -45,10 +46,10 @@ def quote_classification(
     #         "form_id": "acord125/custom"
     #     },
     quote_submission = False
-    quote_class = set()
-    quote_type = set()
-    broker_name = set()
-    form_id = set()
+    quote_class = None
+    quote_type = None
+    acord_form = False
+    form_id = None
 
     # Create classification status in-memory database
     quote_status = {
@@ -59,9 +60,14 @@ def quote_classification(
         "semantic_quote_class": "",
         "semantic_quote_type": "",
         "logo_quote_submission": False,
-        "logo_acord": False,
+        "logo_acord_form": False,
         "footer_quote_submission": False,
         "footer_form_id": "",
+        "gemini_quote_submission": False,
+        "gemini_quote_class": "",
+        "gemini_quote_type": "",
+        "gemini_acord_form": False,
+        "gemini_form_id": "",
     }
 
     ##############################
@@ -149,7 +155,7 @@ def quote_classification(
 
     # if match_found:
     #     quote_status["logo_quote_submission"] = True
-    #     quote_status["logo_acord"] = True
+    #     quote_status["logo_acord_form"] = True
 
     ##############################
     # STEP 5: Footer Search (Acord Form Number)
@@ -159,6 +165,44 @@ def quote_classification(
     if form_id:
         quote_status["footer_quote_submission"] = True
         quote_status["footer_form_id"] = form_id
+
+    ##############################
+    # STEP 6: Gemini Classify
+    ##############################
+    # Convert PDF to Images
+    gemini_output = gemini_classify(pdf_name, pdf_bytes)
+
+    if gemini_output:
+        quote_status["gemini_quote_submission"] = gemini_output["quote_submission"]
+        quote_status["gemini_quote_class"] = gemini_output["quote_class"]
+        quote_status["gemini_quote_type"] = gemini_output["quote_type"]
+        quote_status["gemini_acord_form"] = gemini_output["acord_form"]
+        quote_status["gemini_form_id"] = gemini_output["acord_form_id"]
+
+        ##############################
+        # STEP 7: Consolidate Results
+        ##############################
+        if 
+        quote_status["regex_quote_submission"]
+        quote_status["semantic_quote_submission"]
+        quote_status["logo_quote_submission"]
+        quote_status["footer_quote_submission"]
+        quote_status["gemini_quote_submission"]
+
+        quote_status["regex_quote_class"]
+        quote_status["regex_quote_type"]
+
+        quote_status["semantic_quote_class"]
+        quote_status["semantic_quote_type"]
+
+        quote_status["logo_acord_form"]
+
+        quote_status["footer_form_id"]
+
+        quote_status["gemini_quote_class"]
+        quote_status["gemini_quote_type"]
+        quote_status["gemini_acord_form"]
+        quote_status["gemini_form_id"]
 
     #############################################
     logger.info(f"\n{pprint.pformat(quote_status)}")

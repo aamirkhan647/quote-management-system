@@ -24,12 +24,18 @@ from PIL import Image
 import re
 import os
 from typing import Optional
+import os
+import json
+from pydantic import BaseModel, Field
+from google import genai
+from google.genai import types
+
 
 # Set the path to the Tesseract executable if it's not in your PATH
 # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Import local modules
-from app.utils.txt_utils import clean_ocr_text, get_char_vector
+from app.utils.txt_utils import clean_ocr_text, get_char_vector, get_gemini_key
 
 
 # Logging Configuration
@@ -41,6 +47,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+##############################
 def keyword_matches(paragraph: str, keywords: list) -> int:
     """
     Finds the exact, whole-word matches for a list of keywords in a given paragraph,
@@ -78,6 +85,7 @@ def keyword_matches(paragraph: str, keywords: list) -> int:
     return count
 
 
+##############################
 def cosine_similarity(word1: str, word2: str) -> float:
     """
     Calculates the cosine similarity between two words based on their
@@ -143,6 +151,7 @@ def cosine_similarity(word1: str, word2: str) -> float:
     return numerator / denominator
 
 
+##############################
 def semantic_search(
     text_list: list,
     target_list: list,
@@ -163,63 +172,7 @@ def semantic_search(
     return False
 
 
-# def logo_search(pdf_bytes):
-
-#     try:
-#         pdf_document = pypdfium2.PdfDocument(pdf_bytes)
-#     except Exception as e:
-#         logger.error(
-#             f"Failed to open PDF from bytes. Ensure the file is a valid PDF. Error: {e}"
-#         )
-#         return
-
-#     num_pages = len(pdf_document)
-#     # print(f"Document successfully loaded. Total pages: {num_pages}")
-
-#     if num_pages == 0:
-#         logger.warning("Document is empty.")
-#         return
-
-#     # 2. Access the first page
-#     page_index = 0
-#     page = pdf_document.get_page(page_index)
-
-#     form_type = set()
-#     claim_type = set()
-#     claim_cat = set()
-
-#     # 3. Use the PDF Text Page object for Logo detection
-#     for i in [70, 80, 90, 100, 150, 200]:
-#         bitmap = page.render(scale=300 / i)
-#         image = bitmap.to_pil()
-
-#         # Extract Text using Tesseract
-#         text1 = pytesseract.image_to_string(image)
-
-#         # Clean Text
-#         text2 = clean_ocr_text(text1.lower())
-#         clean_text = text2.split()
-
-#         # Create bi/tri-grams
-#         two_word_phrases = [" ".join(pair) for pair in ngrams(clean_text, 2)]
-#         three_word_phrases = [" ".join(trio) for trio in ngrams(clean_text, 3)]
-
-# # Classify personal vs commercial
-# if ("personal" not in claim_cat) and (
-#     semantic_search(personal_words, clean_text)
-#     or semantic_search(personal_bigrams, two_word_phrases)
-#     or semantic_search(personal_trigrams, three_word_phrases)
-# ):
-#     claim_cat.add("personal")
-
-# if ("commercial" not in claim_cat) and (
-#     semantic_search(commercial_words, clean_text)
-#     or semantic_search(commercial_bigrams, two_word_phrases)
-#     or semantic_search(commercial_trigrams, three_word_phrases)
-# ):
-#     claim_cat.add("commercial")
-
-
+##############################
 def logo_search(image_paths, logo_paths, threshold=0.8):
     """
     Detects a specific pattern (logo/header) within a document image using
@@ -320,6 +273,7 @@ def logo_search(image_paths, logo_paths, threshold=0.8):
     return global_result
 
 
+##############################
 def footer_search(image_paths) -> Optional[str]:
     """
     Identifies the ACORD form type (e.g., ACORD 125) by performing OCR
@@ -395,3 +349,94 @@ def footer_search(image_paths) -> Optional[str]:
                 )
 
             return None
+
+
+##############################
+class ClassificationOutput(BaseModel):
+    """Schema for structured extraction of insurance form details."""
+
+    quote_submission: bool = Field(
+        description="Returns true if the PDF file is a valid insurance quote form or application. Else returns false."
+    )
+    quote_class: str = Field(
+        description="Returns 'personal' for personal auto and property quote requests or 'commercial' for commercial auto and property quote request forms. Return 'NA' if the class is not clearly determined."
+    )
+    quote_type: str = Field(
+        description="Return 'auto' for all types of auto quotes (both personal and commercial) and return 'property' for all sorts of property quotes (including Homeowners, Commercial Property, etc.). Return 'NA' if nothing is found."
+    )
+    acord_form: bool = Field(
+        description="Return true if the form is one of the ACORD standard forms (e.g., ACORD 125, 130). Else return false."
+    )
+    acord_form_id: str = Field(
+        description="If the form is a standard ACORD form, return its standard form number (e.g., 'ACORD 125', 'ACORD 140') exactly as found on the document. Else return 'NA'."
+    )
+
+
+##############################
+def gemini_classify(
+    pdf_name: str,
+    pdf_bytes: bytes,
+) -> ClassificationOutput | None:
+    """
+    Analyzes a PDF provided as bytes using the Gemini API and extracts structured information.
+
+    Args:
+        pdf_name: A descriptive name for the file, used for uploading.
+        pdf_bytes: The byte content of the PDF file.
+
+    Returns:
+        An instance of InsuranceFormAnalysis populated with the results, or None on failure.
+    """
+    try:
+        # Load Gemini API Key
+        api_key = get_gemini_key("../gemini_key.txt")
+
+        # Initialize the Gemini Client
+        client = genai.Client(api_key=api_key)
+    except Exception as e:
+        print(
+            f"Error initializing Gemini client. Check GEMINI_API_KEY environment variable. Error: {e}"
+        )
+        return None
+
+    # uploaded_file = None
+    try:
+        # Define the analysis prompt
+        prompt = (
+            "Analyze the attached insurance document (PDF). Based on the form's "
+            "content, title, and markings, determine the following characteristics. "
+            "Strictly adhere to the provided JSON schema for the output. "
+            "If information cannot be conclusively determined, use 'NA'."
+        )
+
+        # Configure the model to return structured JSON matching the Pydantic schema
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=ClassificationOutput,
+        )
+
+        # Generate Content
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",  # Use Pro for complex document reasoning
+            contents=[
+                types.Part.from_bytes(
+                    data=pdf_bytes,
+                    mime_type="application/pdf",
+                ),
+                prompt,
+            ],
+            config=config,
+        )
+
+        # Parse and Validate the Structured JSON output
+        # The response text will be a JSON string that conforms to the schema
+        json_data = json.loads(response.text)
+
+        # Pydantic validates the JSON structure
+        analysis_result = ClassificationOutput(**json_data)
+
+        return dict(analysis_result)
+
+    except Exception as e:
+        print(f"An error occurred during Gemini analysis: {e}")
+        return None

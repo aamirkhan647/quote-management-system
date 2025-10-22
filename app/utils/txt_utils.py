@@ -119,3 +119,33 @@ def get_char_vector(word: str) -> Dict[str, int]:
     Example: 'apple' -> {'a': 1, 'p': 2, 'l': 1, 'e': 1}
     """
     return Counter(word.lower())
+
+
+def get_gemini_key(file_path: str = "gemini_key.txt") -> str:
+    """
+    Reads the API key from the specified text file.
+
+    Args:
+        file_path: The path to the file containing the API key.
+
+    Returns:
+        The cleaned API key string.
+
+    Raises:
+        FileNotFoundError: If the key file does not exist.
+    """
+    try:
+        # 'r' mode for reading, encoding='utf-8' recommended
+        with open(file_path, "r", encoding="utf-8") as f:
+            # Read the entire content and use .strip() to remove leading/trailing
+            # whitespace or newlines, ensuring only the raw key is used.
+            api_key = f.read().strip()
+            if not api_key:
+                raise ValueError("Key file is empty.")
+            return api_key
+    except FileNotFoundError:
+        print(f"Error: Authentication file not found at {file_path}")
+        raise
+    except Exception as e:
+        print(f"Error reading API key from file: {e}")
+        raise
