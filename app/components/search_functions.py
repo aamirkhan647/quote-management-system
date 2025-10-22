@@ -26,7 +26,7 @@ import os
 from typing import Optional
 import os
 import json
-from pydantic import BaseModel, Field
+
 from google import genai
 from google.genai import types
 
@@ -36,6 +36,7 @@ from google.genai import types
 
 # Import local modules
 from app.utils.txt_utils import clean_ocr_text, get_char_vector, get_gemini_key
+from app.schemas.classification import ClassificationOutput
 
 
 # Logging Configuration
@@ -352,31 +353,10 @@ def footer_search(image_paths) -> Optional[str]:
 
 
 ##############################
-class ClassificationOutput(BaseModel):
-    """Schema for structured extraction of insurance form details."""
-
-    quote_submission: bool = Field(
-        description="Returns true if the PDF file is a valid insurance quote form or application. Else returns false."
-    )
-    quote_class: str = Field(
-        description="Returns 'personal' for personal auto and property quote requests or 'commercial' for commercial auto and property quote request forms. Return 'NA' if the class is not clearly determined."
-    )
-    quote_type: str = Field(
-        description="Return 'auto' for all types of auto quotes (both personal and commercial) and return 'property' for all sorts of property quotes (including Homeowners, Commercial Property, etc.). Return 'NA' if nothing is found."
-    )
-    acord_form: bool = Field(
-        description="Return true if the form is one of the ACORD standard forms (e.g., ACORD 125, 130). Else return false."
-    )
-    acord_form_id: str = Field(
-        description="If the form is a standard ACORD form, return its standard form number (e.g., 'ACORD 125', 'ACORD 140') exactly as found on the document. Else return 'NA'."
-    )
-
-
-##############################
 def gemini_classify(
     pdf_name: str,
     pdf_bytes: bytes,
-) -> ClassificationOutput | None:
+) -> dict | None:
     """
     Analyzes a PDF provided as bytes using the Gemini API and extracts structured information.
 
@@ -387,6 +367,7 @@ def gemini_classify(
     Returns:
         An instance of InsuranceFormAnalysis populated with the results, or None on failure.
     """
+    # Load Gemini Client
     try:
         # Load Gemini API Key
         api_key = get_gemini_key("../gemini_key.txt")
@@ -399,7 +380,7 @@ def gemini_classify(
         )
         return None
 
-    # uploaded_file = None
+    # Get Gemini response
     try:
         # Define the analysis prompt
         prompt = (
